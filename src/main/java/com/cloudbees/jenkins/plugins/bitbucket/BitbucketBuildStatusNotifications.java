@@ -30,6 +30,7 @@ import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredenti
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.model.Item;
 import hudson.model.ItemGroup;
 import hudson.model.Job;
@@ -37,9 +38,13 @@ import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
+import hudson.model.listeners.SCMListener;
 import hudson.plugins.git.Revision;
 import hudson.plugins.git.util.BuildData;
 import hudson.plugins.mercurial.MercurialTagAction;
+import hudson.scm.SCM;
+import hudson.scm.SCMRevisionState;
+import java.io.File;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMSource;
 import jenkins.scm.api.SCMSourceOwner;
@@ -73,6 +78,8 @@ public class BitbucketBuildStatusNotifications {
                 status = new BitbucketBuildStatus(revision, "There was a failure building this commit", "FAILED", url, build.getParent().getName(), build.getDisplayName());
             } else if (result != null) { // ABORTED etc.
                 status = new BitbucketBuildStatus(revision, "Something is wrong with the build of this commit", "FAILED", url, build.getParent().getName(), build.getDisplayName());
+            } else {
+                status = new BitbucketBuildStatus(revision, "The tests have started...", "INPROGRESS", url, build.getParent().getName(), build.getDisplayName());
             }
             if (status != null) {
                 getNotifier(bitbucket).buildStatus(status);
@@ -134,6 +141,8 @@ public class BitbucketBuildStatusNotifications {
         return null;
     }
 
+
+
     /**
      * It is possible having more than one SCMSource in our MultiBranch project.
      * TODO: Does it make sense having more than one of the same type?
@@ -150,34 +159,48 @@ public class BitbucketBuildStatusNotifications {
         }
         return null;
     }
+    
+    private static void sendNotifications(Run<?, ?> build, TaskListener listener)
+    {
+        BitbucketSCMSource source = lookUpSCMSource(build);
+        if (source != null && extractRevision(build) != null) {
+            BitbucketApi bitbucket = buildBitbucketClientForBuild(build, source);
+            if (bitbucket != null) {
+                if (source.getRepoOwner().equals(bitbucket.getOwner()) &&
+                        source.getRepository().equals(bitbucket.getRepositoryName())) {
+                    listener.getLogger().println("[Bitbucket] Notifying commit build result");
+                    createBuildCommitStatus(build, listener, bitbucket);
+                } else {
+                    listener.getLogger().println("[Bitbucket] Notifying pull request build result");
+                    createPullRequestCommitStatus(build, listener, bitbucket);
+                }
+            } else {
+                listener.getLogger().println("[Bitbucket] Can not get connection information from the source. Skipping notification...");
+            }
+        }
+    }
+
+    /**
+     * Sends notifications to Bitbucket on Checkout (for the "In Progress" Status).
+     */
+    @Extension
+    public static class JobCheckOutListener extends SCMListener {
+
+        @Override
+        public void onCheckout(Run<?, ?> build, SCM scm, FilePath workspace, TaskListener listener, File changelogFile, SCMRevisionState pollingBaseline) throws Exception {
+            sendNotifications(build, listener);
+        }
+    }
 
     /**
      * Sends notifications to Bitbucket on Run completed.
-     * TODO: send INPROGRESS status
      */
     @Extension
     public static class JobCompletedListener extends RunListener<Run<?,?>> {
 
         @Override 
         public void onCompleted(Run<?, ?> build, TaskListener listener) {
-            BitbucketSCMSource source = lookUpSCMSource(build);
-            if (source != null && extractRevision(build) != null) {
-                BitbucketApi bitbucket = buildBitbucketClientForBuild(build, source);
-                if (bitbucket != null) {
-                    if (source.getRepoOwner().equals(bitbucket.getOwner()) &&
-                            source.getRepository().equals(bitbucket.getRepositoryName())) {
-                        listener.getLogger().println("[Bitbucket] Notifying commit build result");
-                        createBuildCommitStatus(build, listener, bitbucket);
-                    } else {
-                        listener.getLogger().println("[Bitbucket] Notifying pull request build result");
-                        createPullRequestCommitStatus(build, listener, bitbucket);
-                    }
-                } else {
-                    listener.getLogger().println("[Bitbucket] Can not get connection information from the source. Skipping notification...");
-                }
-            }
+            sendNotifications(build, listener);
         }
-
     }
-
 }
