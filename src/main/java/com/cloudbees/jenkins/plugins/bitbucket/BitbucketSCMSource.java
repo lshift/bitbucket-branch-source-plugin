@@ -276,7 +276,8 @@ public class BitbucketSCMSource extends SCMSource {
         }
 
         // Search branches
-        retrieveBranches(observer, listener);
+        // @beubi we don't need to build on branches, only on pull requests
+        //        retrieveBranches(observer, listener);
         // Search pull requests
         retrievePullRequests(observer, listener);
     }
