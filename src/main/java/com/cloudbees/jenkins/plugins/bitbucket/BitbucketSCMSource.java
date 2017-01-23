@@ -777,7 +777,7 @@ public class BitbucketSCMSource extends SCMSource {
     protected List<UserRemoteConfig> getGitRemoteConfigs(PullRequestSCMHead head) {
         List<UserRemoteConfig> result = new ArrayList<UserRemoteConfig>();
         String remote = getRemote(head.getRepoOwner(), head.getRepository(), BitbucketRepositoryType.GIT);
-        result.add(new UserRemoteConfig(remote, getRemoteName(), "+refs/heads/" + head.getBranchName(), getCheckoutEffectiveCredentials()));
+        result.add(new UserRemoteConfig(remote, getRemoteName(), "+refs/heads/" + head.getBranchName() + ":refs/remotes/origin/" + head.getBranchName(), getCheckoutEffectiveCredentials()));
         if(head.isMerge()){
             //We must add a remote...
             remote = getRemote(repoOwner,repository);
