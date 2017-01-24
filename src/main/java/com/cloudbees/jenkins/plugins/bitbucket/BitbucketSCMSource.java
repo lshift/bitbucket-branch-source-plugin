@@ -534,45 +534,20 @@ public class BitbucketSCMSource extends SCMSource {
         SCMRevision revision;
         // This is a pullRequest
         if(pr != null){
-            //This is a fork
-            if(fork){
-                if(buildForkPRHead && buildForkPRMerge){
-                    // We must make two jobs...
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, true);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
+            Boolean buildPRMerge = fork ? buildForkPRMerge : buildOriginPRMerge;
+            Boolean buildPRHead = fork ? buildForkPRHead : buildOriginPRHead;
+            Boolean addHeadSuffix = buildPRMerge && buildPRHead;
 
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, false, true);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
-                }else if(buildForkPRHead){
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, false);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
-                }else if(buildForkPRMerge){
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, true);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
-                }
-            }else{
-                if(buildOriginPRMerge && buildOriginPRHead){
-                    // We must make two jobs...
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, true);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
+            if (buildPRMerge) {
+                head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, true);
+                revision = getRevision(head, hash, pr);
+                observer.observe(head, revision);
+            }
 
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, false, true);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
-                }else if(buildOriginPRHead){
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, false);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
-                }else if(buildOriginPRMerge){
-                    head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, true);
-                    revision = getRevision(head, hash, pr);
-                    observer.observe(head, revision);
-                }
+            if (buildPRHead) {
+                head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, false, addHeadSuffix);
+                revision = getRevision(head, hash, pr);
+                observer.observe(head, revision);
             }
         }else{
             // Basic Branch
