@@ -428,28 +428,24 @@ public class BitbucketSCMSource extends SCMSource {
                     continue;
                 }
                 Boolean fork = (!pull.getSource().getRepository().getOwnerName().equals(repoOwner));
-                if (hash != null) {
-                    getPullRequestTitleCache().put(pull.getId(), StringUtils.defaultString(pull.getTitle()));
-                    livePRs.add(pull.getId());
-                    getPullRequestContributorCache().put(pull.getId(),
-                            // TODO get more details on the author
-                            new ContributorMetadataAction(pull.getAuthorLogin(), null, null)
-                    );
-                    if( (fork && buildForkPRMerge) || (fork && buildForkPRHead) || (!fork && buildOriginPRHead) || (!fork && buildOriginPRMerge)) {
-                        observe(criteria, observer, listener,
-                                pull.getSource().getRepository().getOwnerName(),
-                                pull.getSource().getRepository().getRepositoryName(),
-                                pull.getSource().getBranch().getName(),
-                                hash,
-                                pull,
-                                fork);
-                    }
-                    if (!fork) {
-                        branchesObserved.add(pull.getSource().getBranch().getName());
-                    }
-                } else {
-                    listener.getLogger().format("      Can not resolve hash: [%s]%n", pull.getSource().getCommit().getHash());
-                    listener.getLogger().format("      Can not resolve hash: [%s]%n", pull.getSource().getCommit().getHash());
+
+                getPullRequestTitleCache().put(pull.getId(), StringUtils.defaultString(pull.getTitle()));
+                livePRs.add(pull.getId());
+                getPullRequestContributorCache().put(pull.getId(),
+                        // TODO get more details on the author
+                        new ContributorMetadataAction(pull.getAuthorLogin(), null, null)
+                );
+                if( (fork && buildForkPRMerge) || (fork && buildForkPRHead) || (!fork && buildOriginPRHead) || (!fork && buildOriginPRMerge)) {
+                    observe(criteria, observer, listener,
+                            pull.getSource().getRepository().getOwnerName(),
+                            pull.getSource().getRepository().getRepositoryName(),
+                            pull.getSource().getBranch().getName(),
+                            hash,
+                            pull,
+                            fork);
+                }
+                if (!fork) {
+                    branchesObserved.add(pull.getSource().getBranch().getName());
                 }
                 if (!observer.isObserving()) {
                     listener.getLogger().format("      Skipping not observing... : [%s]%n", pull.getSource().getCommit().getHash());
