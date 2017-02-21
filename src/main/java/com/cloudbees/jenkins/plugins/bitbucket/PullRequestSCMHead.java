@@ -86,7 +86,7 @@ public class PullRequestSCMHead extends SCMHead implements ChangeRequestSCMHead 
         return this;
     }
 
-    public PullRequestSCMHead(String repoOwner, String repository, String branchName, BitbucketPullRequest pr, Boolean merge) {
+    public PullRequestSCMHead(String repoOwner, String repository, BitbucketRepositoryType repositoryType, String branchName, BitbucketPullRequest pr, Boolean merge) {
         super(PR_BRANCH_PREFIX + pr.getId());
         this.repoOwner = repoOwner;
         this.repository = repository;
@@ -96,7 +96,7 @@ public class PullRequestSCMHead extends SCMHead implements ChangeRequestSCMHead 
         this.merge = merge;
     }
 
-    public PullRequestSCMHead(String repoOwner, String repository, String branchName, BitbucketPullRequest pr, Boolean merge, Boolean addSuffix) {
+    public PullRequestSCMHead(String repoOwner, String repository, BitbucketRepositoryType repositoryType, String branchName, BitbucketPullRequest pr, Boolean merge, Boolean addSuffix) {
         super(PR_BRANCH_PREFIX + pr.getId() + (addSuffix ? PR_BRANCH_HEAD_SUFFIX : ""));
         this.repoOwner = repoOwner;
         this.repository = repository;

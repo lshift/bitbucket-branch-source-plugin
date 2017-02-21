@@ -409,9 +409,7 @@ public class BitbucketSCMSource extends SCMSource {
                 listener.getLogger().println(
                         "    Checking PR from " + pull.getSource().getRepository().getFullName() + " and branch "
                                 + pull.getSource().getBranch().getName());
-
                 // Resolve full hash. See https://bitbucket.org/site/master/issues/11415/pull-request-api-should-return-full-commit
-
                 String hash;
                 try {
                     hash = bitbucket.resolveSourceFullHash(pull);
@@ -453,19 +451,6 @@ public class BitbucketSCMSource extends SCMSource {
                     listener.getLogger().format("      Can not resolve hash: [%s]%n", pull.getSource().getCommit().getHash());
                     listener.getLogger().format("      Can not resolve hash: [%s]%n", pull.getSource().getCommit().getHash());
                 }
-                getPullRequestTitleCache().put(pull.getId(), StringUtils.defaultString(pull.getTitle()));
-                livePRs.add(pull.getId());
-                getPullRequestContributorCache().put(pull.getId(),
-                        // TODO get more details on the author
-                        new ContributorMetadataAction(pull.getAuthorLogin(), null, null)
-                );
-                observe(criteria, observer, listener,
-                        pull.getSource().getRepository().getOwnerName(),
-                        pull.getSource().getRepository().getRepositoryName(),
-                        pull.getSource().getBranch().getName(),
-                        hash,
-                        pull,
-                        fork);
                 if (!observer.isObserving()) {
                     listener.getLogger().format("      Skipping not observing... : [%s]%n", pull.getSource().getCommit().getHash());
                 }
@@ -514,13 +499,6 @@ public class BitbucketSCMSource extends SCMSource {
                 return;
             }
         }
-//<<<<<<< HEAD
-        BitbucketRepositoryType repositoryType = getRepositoryType();
-//        SCMRevision revision;
-//        SCMHead head = pr != null
-//                ? new PullRequestSCMHead(owner, repositoryName, repositoryType, branchName, pr)
-//                : new BranchSCMHead(branchName, repositoryType);
-
         observeFactory(observer, listener, owner, repositoryName, branchName, hash, pr, fork);
     }
 
@@ -539,19 +517,19 @@ public class BitbucketSCMSource extends SCMSource {
             Boolean addHeadSuffix = buildPRMerge && buildPRHead;
 
             if (buildPRMerge) {
-                head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, true);
+                head = new PullRequestSCMHead(owner, repositoryName, getRepositoryType(), branchName, pr, true);
                 revision = getRevision(head, hash, pr);
                 observer.observe(head, revision);
             }
 
             if (buildPRHead) {
-                head = new PullRequestSCMHead(owner, repositoryName, branchName, pr, false, addHeadSuffix);
+                head = new PullRequestSCMHead(owner, repositoryName, getRepositoryType(), branchName, pr, false, addHeadSuffix);
                 revision = getRevision(head, hash, pr);
                 observer.observe(head, revision);
             }
         }else{
             // Basic Branch
-            head = new BranchSCMHead(branchName);
+            head = new BranchSCMHead(branchName, getRepositoryType());
             revision = getRevision(head, hash, null);
             observer.observe(head, revision);
         }
@@ -566,7 +544,7 @@ public class BitbucketSCMSource extends SCMSource {
      */
     private SCMRevision getRevision(final SCMHead head, final String hash, BitbucketPullRequest pr) throws IOException, InterruptedException{
         SCMRevision revision;
-        if (getRepositoryType() == RepositoryType.MERCURIAL) {
+        if (getRepositoryType() == BitbucketRepositoryType.MERCURIAL) {
             revision = new MercurialRevision(head, hash);
         } else {
             if (pr != null) {
@@ -604,13 +582,13 @@ public class BitbucketSCMSource extends SCMSource {
                     if (commit == null) {
                         listener.getLogger().format("Can not resolve commit by hash [%s] on repository %s/%s%n",
                                 hash, bitbucket.getOwner(), bitbucket.getRepositoryName());
-                       // return 0;
+                        return 0;
                     }
                     return commit.getDateMillis();
                 } catch (InterruptedException | IOException e) {
                     listener.getLogger().format("Can not resolve commit by hash [%s] on repository %s/%s%n",
                             hash, bitbucket.getOwner(), bitbucket.getRepositoryName());
-                    // return 0;
+                    return 0;
                 }
             }
 
@@ -755,7 +733,7 @@ public class BitbucketSCMSource extends SCMSource {
         result.add(new UserRemoteConfig(remote, getRemoteName(), "+refs/heads/" + head.getBranchName() + ":refs/remotes/origin/" + head.getBranchName(), getCheckoutEffectiveCredentials()));
         if(head.isMerge()){
             //We must add a remote...
-            remote = getRemote(repoOwner,repository);
+            remote = getRemote(repoOwner,repository, BitbucketRepositoryType.GIT);
             String upstreamRefs = "+refs/heads/" + head.getTarget().getName() + ":refs/remotes/upstream/" + head.getTarget().getName();
             result.add(new UserRemoteConfig(remote, "upstream" , upstreamRefs, getCheckoutEffectiveCredentials()));
         }
