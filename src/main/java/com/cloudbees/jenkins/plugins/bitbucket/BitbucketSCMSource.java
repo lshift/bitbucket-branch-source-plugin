@@ -53,6 +53,7 @@ import hudson.plugins.git.UserMergeOptions;
 import hudson.plugins.git.extensions.GitSCMExtension;
 import hudson.plugins.git.extensions.impl.BuildChooserSetting;
 import hudson.plugins.git.extensions.impl.PreBuildMerge;
+import hudson.plugins.git.extensions.impl.UserIdentity;
 import hudson.plugins.git.util.BuildChooser;
 import hudson.plugins.git.util.DefaultBuildChooser;
 import hudson.plugins.mercurial.MercurialSCM;
@@ -106,7 +107,7 @@ import org.kohsuke.stapler.QueryParameter;
 /**
  * SCM source implementation for Bitbucket.
  * 
- * It provides a way to discover/retrieve branches and pull requests through the Bitbuclet REST API
+ * It provides a way to discover/retrieve branches and pull requests through the Bitbucket REST API
  * which is much faster than the plain Git SCM source implementation.
  */
 public class BitbucketSCMSource extends SCMSource {
@@ -785,6 +786,7 @@ public class BitbucketSCMSource extends SCMSource {
                     }
                     scm.getExtensions().add(new BuildChooserSetting(buildChooser));
                 }else{
+                    scm.getExtensions().add(new UserIdentity("Jenkins server", "jenkins@not.a.real.email"));
                     scm.getExtensions().add(new PreBuildMerge(new UserMergeOptions("upstream", h.getTarget().getName(), null, MergeCommand.GitPluginFastForwardMode.NO_FF)));
                 }
                 return scm;
