@@ -27,6 +27,7 @@ import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketApi;
 import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketApiFactory;
 import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketBranch;
 import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketCommit;
+import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketHref;
 import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketPullRequest;
 import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketRepository;
 import com.cloudbees.jenkins.plugins.bitbucket.api.BitbucketRepositoryProtocol;
@@ -61,6 +62,8 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -94,6 +97,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.WordUtils;
 import org.eclipse.jgit.lib.Constants;
 import org.jenkinsci.plugins.gitclient.MergeCommand;
+import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
@@ -151,12 +155,6 @@ public class BitbucketSCMSource extends SCMSource {
     private String bitbucketServerUrl;
 
     /**
-     * Port used by Bitbucket Server for SSH clone.
-     * -1 by default (for Bitbucket Cloud).
-     */
-    private int sshPort = -1;
-
-    /**
      * Repository type.
      */
     private BitbucketRepositoryType repositoryType;
@@ -182,6 +180,9 @@ public class BitbucketSCMSource extends SCMSource {
     private boolean buildOriginPRHead = DescriptorImpl.defaultBuildOriginPRHead;
     private boolean buildForkPRHead = DescriptorImpl.defaultBuildForkPRHead;
     private boolean buildForkPRMerge = DescriptorImpl.defaultBuildForkPRMerge;
+
+    @CheckForNull
+    private transient List<BitbucketHref> cloneLinks = null;
 
     private static final Logger LOGGER = Logger.getLogger(BitbucketSCMSource.class.getName());
 
@@ -247,15 +248,6 @@ public class BitbucketSCMSource extends SCMSource {
 
     public boolean isAutoRegisterHook() {
         return autoRegisterHook;
-    }
-
-    public int getSshPort() {
-        return sshPort;
-    }
-
-    @DataBoundSetter
-    public void setSshPort(int sshPort) {
-        this.sshPort = sshPort;
     }
 
     @DataBoundSetter
@@ -338,8 +330,21 @@ public class BitbucketSCMSource extends SCMSource {
             protocol = BitbucketRepositoryProtocol.HTTP;
         } else if (getCheckoutCredentials() instanceof SSHUserPrivateKey) {
             protocol = BitbucketRepositoryProtocol.SSH;
-            if (sshPort > 0) {
-                protocolPortOverride = sshPort;
+            if (cloneLinks != null) {
+                for (BitbucketHref link : cloneLinks) {
+                    if ("ssh".equals(link.getName())) {
+                        // extract the port from this link and use that
+                        try {
+                            URI uri = new URI(link.getHref());
+                            if (uri.getPort() != -1) {
+                                protocolPortOverride = uri.getPort();
+                            }
+                        } catch (URISyntaxException e) {
+                            // ignore
+                        }
+                        break;
+                    }
+                }
             }
         } else {
             protocol = BitbucketRepositoryProtocol.HTTP;
@@ -349,7 +354,12 @@ public class BitbucketSCMSource extends SCMSource {
 
     public BitbucketRepositoryType getRepositoryType() throws IOException, InterruptedException {
         if (repositoryType == null) {
-            repositoryType = BitbucketRepositoryType.fromString(buildBitbucketClient().getRepository().getScm());
+            BitbucketRepository r = buildBitbucketClient().getRepository();
+            repositoryType = BitbucketRepositoryType.fromString(r.getScm());
+            Map<String, List<BitbucketHref>> links = r.getLinks();
+            if (links != null && links.containsKey("clone")) {
+                cloneLinks = links.get("clone");
+            }
         }
         return repositoryType;
     }
@@ -378,6 +388,9 @@ public class BitbucketSCMSource extends SCMSource {
     protected void retrieve(@CheckForNull SCMSourceCriteria criteria, @NonNull SCMHeadObserver observer,
                             @CheckForNull SCMHeadEvent<?> event, @NonNull TaskListener listener)
             throws IOException, InterruptedException {
+        if (event != null) {
+            observer = event.filter(this, observer);
+        }
         StandardUsernamePasswordCredentials scanCredentials = getScanCredentials();
         if (scanCredentials == null) {
             listener.getLogger().format("Connecting to %s with no credentials, anonymous access%n", bitbucketUrl());
@@ -404,8 +417,17 @@ public class BitbucketSCMSource extends SCMSource {
         if (bitbucket.isPrivate()) {
             List<? extends BitbucketPullRequest> pulls = bitbucket.getPullRequests();
             Set<String> livePRs = new HashSet<>();
+            Set<SCMHead> includes = observer.getIncludes();
             for (final BitbucketPullRequest pull : pulls) {
                 checkInterrupt();
+                PullRequestSCMHead head = new PullRequestSCMHead(pull.getSource().getRepository().getOwnerName(),
+                        pull.getSource().getRepository().getRepositoryName(), repositoryType,
+                        pull.getSource().getBranch().getName(), pull);
+                if (includes != null && !includes.contains(head)) {
+                    continue;
+                }
+
+
                 listener.getLogger().println(
                         "    Checking PR from " + pull.getSource().getRepository().getFullName() + " and branch "
                                 + pull.getSource().getBranch().getName());
@@ -466,7 +488,12 @@ public class BitbucketSCMSource extends SCMSource {
         listener.getLogger().println("Looking up " + fullName + " for branches");
 
         final BitbucketApi bitbucket = buildBitbucketClient();
+        Map<String, List<BitbucketHref>> links = bitbucket.getRepository().getLinks();
+        if (links != null && links.containsKey("clone")) {
+            cloneLinks = links.get("clone");
+        }
         List<? extends BitbucketBranch> branches = bitbucket.getBranches();
+        Set<SCMHead> includes = observer.getIncludes();
         for (BitbucketBranch branch : branches) {
             checkInterrupt();
             listener.getLogger().println("    Checking branch " + branch.getName() + " from " + fullName);
@@ -474,6 +501,9 @@ public class BitbucketSCMSource extends SCMSource {
             if( (buildOriginBranch && !branchMatchPR) || (buildOriginBranchWithPR && branchMatchPR) ) {
                 observe(criteria,observer, listener, repoOwner, repository, branch.getName(),
                         branch.getRawNode(), null, false);
+                if (!observer.isObserving()) {
+                    return;
+                }
             }
         }
     }
@@ -661,6 +691,40 @@ public class BitbucketSCMSource extends SCMSource {
                 }
             }
         }
+        if (cloneLinks == null) {
+            BitbucketApi bitbucket = buildBitbucketClient();
+            try {
+                BitbucketRepository r = bitbucket.getRepository();
+                Map<String, List<BitbucketHref>> links = r.getLinks();
+                if (links != null && links.containsKey("clone")) {
+                    cloneLinks = links.get("clone");
+                }
+            } catch (IOException | InterruptedException e) {
+                LOGGER.log(Level.SEVERE,
+                        "Could not determine clone links of " + getRepoOwner() + "/" + getRepository()
+                                + " on " + StringUtils.defaultIfBlank(getBitbucketServerUrl(), "bitbucket.org")
+                                + " for " + getOwner() + " falling back to generated links", e);
+                cloneLinks = new ArrayList<>();
+                cloneLinks.add(new BitbucketHref("ssh",
+                        bitbucket.getRepositoryUri(
+                                repositoryType,
+                                BitbucketRepositoryProtocol.SSH,
+                                null,
+                                getRepoOwner(),
+                                getRepository()
+                        )
+                ));
+                cloneLinks.add(new BitbucketHref("https",
+                        bitbucket.getRepositoryUri(
+                                repositoryType,
+                                BitbucketRepositoryProtocol.HTTP,
+                                null,
+                                getRepoOwner(),
+                                getRepository()
+                        )
+                ));
+            }
+        }
         if (head instanceof PullRequestSCMHead) {
             PullRequestSCMHead h = (PullRequestSCMHead) head;
             if (repositoryType == BitbucketRepositoryType.MERCURIAL) {
@@ -822,6 +886,10 @@ public class BitbucketSCMSource extends SCMSource {
         List<Action> result = new ArrayList<>();
         final BitbucketApi bitbucket = buildBitbucketClient();
         BitbucketRepository r = bitbucket.getRepository();
+        Map<String, List<BitbucketHref>> links = r.getLinks();
+        if (links != null && links.containsKey("clone")) {
+            cloneLinks = links.get("clone");
+        }
         result.add(new BitbucketRepoMetadataAction(r));
         String defaultBranch = bitbucket.getDefaultBranch();
         if (StringUtils.isNotBlank(defaultBranch)) {
@@ -916,6 +984,7 @@ public class BitbucketSCMSource extends SCMSource {
         return pullRequestContributorCache;
     }
 
+    @Symbol("bitbucket")
     @Extension
     public static class DescriptorImpl extends SCMSourceDescriptor {
 
@@ -1048,6 +1117,12 @@ public class BitbucketSCMSource extends SCMSource {
         public int hashCode() {
             return hash != null ? hash.hashCode() : 0;
         }
+
+        @Override
+        public String toString() {
+            return hash;
+        }
+
     }
 
 }
