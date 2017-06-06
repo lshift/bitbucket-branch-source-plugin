@@ -29,11 +29,17 @@
     <f:entry title="${%Bitbucket Server SSH port}" field="sshPort">
       <f:textbox />
     </f:entry>
-    <f:entry  title="${%buildOriginBranch.title}" field="buildOriginBranch">
+    <f:entry title="${%displaySeparateTypesOfBuilds.title}" field="displaySeparateTypesOfBuilds">
+        <f:checkbox default="${descriptor.defaultDisplaySeparateTypesOfBuilds}"/>
+    </f:entry>
+    <f:entry title="${%buildOriginBranch.title}" field="buildOriginBranch">
         <f:checkbox default="${descriptor.defaultBuildOriginBranch}"/>
     </f:entry>
-     <f:entry title="${%buildOriginBranchWithPR.title}" field="buildOriginBranchWithPR">
+    <f:entry title="${%buildOriginBranchWithPR.title}" field="buildOriginBranchWithPR">
         <f:checkbox default="${descriptor.defaultBuildOriginBranchWithPR}"/>
+    </f:entry>
+    <f:entry title="${%buildOriginBranchPattern.title}" field="buildOriginBranchPattern">
+      <f:textbox default="${descriptor.defaultBuildOriginBranchPattern}"/>
     </f:entry>
     <f:entry title="${%buildOriginPRHead.title}" field="buildOriginPRHead">
         <f:checkbox default="${descriptor.defaultBuildOriginPRHead}"/>

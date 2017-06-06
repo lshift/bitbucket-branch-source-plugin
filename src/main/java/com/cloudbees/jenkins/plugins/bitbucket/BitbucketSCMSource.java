@@ -172,14 +172,16 @@ public class BitbucketSCMSource extends SCMSource {
     private transient /*effectively final*/ Map<String, ContributorMetadataAction> pullRequestContributorCache;
     
      /**
-      * Beavior of the job created
+      * Behavior of the job created
       **/
+    private String buildOriginBranchPattern = DescriptorImpl.defaultBuildOriginBranchPattern;
     private boolean buildOriginBranch = DescriptorImpl.defaultBuildOriginBranch;
     private boolean buildOriginBranchWithPR = DescriptorImpl.defaultBuildOriginBranchWithPR;
     private boolean buildOriginPRMerge = DescriptorImpl.defaultBuildOriginPRMerge;
     private boolean buildOriginPRHead = DescriptorImpl.defaultBuildOriginPRHead;
     private boolean buildForkPRHead = DescriptorImpl.defaultBuildForkPRHead;
     private boolean buildForkPRMerge = DescriptorImpl.defaultBuildForkPRMerge;
+    private boolean displaySeparateTypesOfBuilds = DescriptorImpl.defaultDisplaySeparateTypesOfBuilds;
 
     @CheckForNull
     private transient List<BitbucketHref> cloneLinks = null;
@@ -278,6 +280,15 @@ public class BitbucketSCMSource extends SCMSource {
     }
 
     @DataBoundSetter
+    public void setBuildOriginBranchPattern(@NonNull String buildOriginBranchPattern){
+        this.buildOriginBranchPattern = buildOriginBranchPattern;
+    }
+
+    public String getBuildOriginBranchPattern(){
+        return buildOriginBranchPattern;
+    }
+
+    @DataBoundSetter
     public void setBuildOriginPRMerge(boolean buildOriginPRMerge){
         this.buildOriginPRMerge = buildOriginPRMerge;
     }
@@ -311,6 +322,15 @@ public class BitbucketSCMSource extends SCMSource {
 
     public boolean isBuildForkPRMerge(){
         return buildForkPRMerge;
+    }
+
+    @DataBoundSetter
+    public void setDisplaySeparateTypesOfBuilds(boolean displaySeparateTypesOfBuilds){
+        this.displaySeparateTypesOfBuilds = displaySeparateTypesOfBuilds;
+    }
+
+    public boolean isDisplaySeparateTypesOfBuilds(){
+        return displaySeparateTypesOfBuilds;
     }
 
     @CheckForNull
@@ -481,6 +501,10 @@ public class BitbucketSCMSource extends SCMSource {
         return branchesObserved;
     }
 
+    private boolean branchIsExcluded(String branchName) {
+        return !Pattern.matches(getPattern(this.buildOriginBranchPattern), branchName);
+    }
+
     private void retrieveBranches(SCMSourceCriteria criteria, @NonNull final SCMHeadObserver observer,
                                   @NonNull TaskListener listener, ArrayList<String> branchesObserved)
             throws IOException, InterruptedException {
@@ -498,8 +522,11 @@ public class BitbucketSCMSource extends SCMSource {
             checkInterrupt();
             listener.getLogger().println("    Checking branch " + branch.getName() + " from " + fullName);
             boolean branchMatchPR  = branchesObserved.contains(branch.getName());
+            if (!branchMatchPR && branchIsExcluded(branch.getName())) {
+                continue;
+            }
             if( (buildOriginBranch && !branchMatchPR) || (buildOriginBranchWithPR && branchMatchPR) ) {
-                observe(criteria,observer, listener, repoOwner, repository, branch.getName(),
+                observe(criteria, observer, listener, repoOwner, repository, branch.getName(),
                         branch.getRawNode(), null, false);
                 if (!observer.isObserving()) {
                     return;
@@ -515,10 +542,9 @@ public class BitbucketSCMSource extends SCMSource {
             return;
         }
         final BitbucketApi bitbucket = BitbucketApiFactory.newInstance(bitbucketServerUrl, getScanCredentials(), owner, repositoryName);
-        SCMSourceCriteria branchCriteria = criteria;
-        if (branchCriteria != null) {
+        if (criteria != null) {
             SCMSourceCriteria.Probe probe = getProbe(branchName, bitbucket, hash, listener);
-            if (branchCriteria.isHead(probe, listener)) {
+            if (criteria.isHead(probe, listener)) {
                 listener.getLogger().println("Met criteria");
             } else {
                 listener.getLogger().println("Does not meet criteria");
@@ -583,6 +609,13 @@ public class BitbucketSCMSource extends SCMSource {
             }
         }
         return revision;
+    }
+
+    protected boolean isCategoryEnabled(@NonNull SCMHeadCategory category) {
+        if (category instanceof ChangeRequestSCMHeadCategory && displaySeparateTypesOfBuilds) {
+            return false;
+        }
+        return super.isCategoryEnabled(category);
     }
 
     /**
@@ -991,12 +1024,15 @@ public class BitbucketSCMSource extends SCMSource {
         public static final String ANONYMOUS = "ANONYMOUS";
         public static final String SAME = "SAME";
 
+        public static final String defaultBuildOriginBranchPattern = "*";
         public static final boolean defaultBuildOriginBranch = true;
         public static final boolean defaultBuildOriginBranchWithPR = false;
         public static final boolean defaultBuildOriginPRMerge = false;
         public static final boolean defaultBuildOriginPRHead = true;
         public static final boolean defaultBuildForkPRHead = true;
         public static final boolean defaultBuildForkPRMerge = false;
+
+        public static final boolean defaultDisplaySeparateTypesOfBuilds = true;
 
         @Override
         public String getDisplayName() {

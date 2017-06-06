@@ -84,8 +84,10 @@ public class BitbucketSCMNavigator extends SCMNavigator {
     private String excludes = "";
 
     /**
-     * Beavior of the job created
+     * Behavior of the job created
      **/
+    private String buildOriginBranchPattern = DescriptorImpl.defaultbuildOriginBranchPattern;
+    private boolean displaySeparateTypesOfBuilds = DescriptorImpl.defaultDisplaySeparateTypesOfBuilds;
     private boolean buildOriginBranch = DescriptorImpl.defaultBuildOriginBranch;
     private boolean buildOriginBranchWithPR = DescriptorImpl.defaultBuildOriginBranchWithPR;
     private boolean buildOriginPRMerge = DescriptorImpl.defaultBuildOriginPRMerge;
@@ -192,6 +194,15 @@ public class BitbucketSCMNavigator extends SCMNavigator {
     }
 
     @DataBoundSetter
+    public void setBuildOriginBranchPattern(String buildOriginBranchPattern){
+        this.buildOriginBranchPattern = buildOriginBranchPattern;
+    }
+
+    public String getBuildOriginBranchPattern(){
+        return buildOriginBranchPattern;
+    }
+
+    @DataBoundSetter
     public void setBuildOriginPRMerge(boolean buildOriginPRMerge){
         this.buildOriginPRMerge = buildOriginPRMerge;
     }
@@ -230,6 +241,15 @@ public class BitbucketSCMNavigator extends SCMNavigator {
     @CheckForNull
     public String getBitbucketServerUrl() {
         return bitbucketServerUrl;
+    }
+
+    @DataBoundSetter
+    public void setDisplaySeparateTypesOfBuilds(boolean displaySeparateTypesOfBuilds){
+        this.displaySeparateTypesOfBuilds = displaySeparateTypesOfBuilds;
+    }
+
+    public boolean isDisplaySeparateTypesOfBuilds(){
+        return displaySeparateTypesOfBuilds;
     }
 
     public String getIncludes() {
@@ -319,6 +339,8 @@ public class BitbucketSCMNavigator extends SCMNavigator {
         scmSource.setBuildOriginPRMerge(buildOriginPRMerge);
         scmSource.setBuildForkPRHead(buildForkPRHead);
         scmSource.setBuildForkPRMerge(buildForkPRMerge);
+        scmSource.setBuildOriginBranchPattern(buildOriginBranchPattern);
+        scmSource.setDisplaySeparateTypesOfBuilds(displaySeparateTypesOfBuilds);
         scmSource.setIncludes(includes);
         scmSource.setExcludes(excludes);
         projectObserver.addSource(scmSource);
@@ -400,6 +422,8 @@ public class BitbucketSCMNavigator extends SCMNavigator {
         public static final String ANONYMOUS = BitbucketSCMSource.DescriptorImpl.ANONYMOUS;
         public static final String SAME = BitbucketSCMSource.DescriptorImpl.SAME;
 
+        public static final String defaultbuildOriginBranchPattern = BitbucketSCMSource.DescriptorImpl.defaultBuildOriginBranchPattern;
+        public static final boolean defaultDisplaySeparateTypesOfBuilds = BitbucketSCMSource.DescriptorImpl.defaultDisplaySeparateTypesOfBuilds;
         public static final boolean defaultBuildOriginBranch = BitbucketSCMSource.DescriptorImpl.defaultBuildOriginBranch;
         public static final boolean defaultBuildOriginBranchWithPR = BitbucketSCMSource.DescriptorImpl.defaultBuildOriginBranchWithPR;
         public static final boolean defaultBuildOriginPRMerge = BitbucketSCMSource.DescriptorImpl.defaultBuildOriginPRMerge;
