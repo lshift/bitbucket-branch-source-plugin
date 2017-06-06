@@ -1,8 +1,8 @@
 package com.cloudbees.jenkins.plugins.bitbucket;
 
 import jenkins.plugins.git.AbstractGitSCMSource;
-import jenkins.scm.api.SCMRevision;
 import javax.annotation.Nonnull;
+import java.util.Objects;
 
 /**
  * Revision of a Pull Request
@@ -41,7 +41,7 @@ public class PullRequestSCMRevision extends AbstractGitSCMSource.SCMRevisionImpl
             return false;
         }
         PullRequestSCMRevision other = (PullRequestSCMRevision) o;
-        return getHead().equals(other.getHead()) && baseHash.equals(other.baseHash) && getPullHash().equals(other.getPullHash());
+        return Objects.equals(getHead(), other.getHead()) && Objects.equals(getPullHash(), other.getPullHash()) && Objects.equals(baseHash, other.baseHash);
     }
 
     @Override
