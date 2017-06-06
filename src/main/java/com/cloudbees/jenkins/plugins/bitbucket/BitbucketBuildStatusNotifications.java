@@ -68,6 +68,9 @@ public class BitbucketBuildStatusNotifications {
             String url;
             try {
                 url = DisplayURLProvider.get().getRunURL(build);
+                if (url.contains("http://unconfigured-jenkins-location/")) {
+                    throw new IllegalStateException("Unconfigured Jenkins root URL");
+                }
             } catch (IllegalStateException e) {
                 listener.getLogger().println("Can not determine Jenkins root URL. Commit status notifications are disabled until a root URL is configured in Jenkins global configuration.");
                 return;
